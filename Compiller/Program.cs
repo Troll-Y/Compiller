@@ -22,7 +22,6 @@ namespace Compiller
         static List<string> my_K = new List<string>();
         static List<string> Comments = new List<string>();
 
-        static List<string> startCode = new List<string>();
         static List<string> dataCode = new List<string>();
         static List<string> mainCode = new List<string>();
 
@@ -83,11 +82,6 @@ namespace Compiller
                 File.Delete(path);
             using (StreamWriter code = new StreamWriter(path, true))
             {
-                foreach (string SCode in startCode)
-                {
-                    code.WriteLine(SCode);
-                }
-
                 foreach (string DCode in dataCode)
                 {
                     code.WriteLine(DCode);
@@ -374,18 +368,23 @@ namespace Compiller
                         {
                             while (buff[posB] != '/')
                             {
-                                word += buff[posB];
-                                posB++;
+                                if (!(buff[posB] == ' '))
+                                    word += buff[posB];
+                                posB++;                                
                                 if (posB >= str[row].Length)
                                 {
                                     row++;
                                     posB = 0;
                                     buff = str[row].ToCharArray(0, str[row].Length);
+                                    word += ' ';
                                 }
                             }
                             word += buff[posB];
+                            char[] charsToTrim = { '/', '*', '/', '*' };
+                            word = word.Trim(charsToTrim);
                             posB++;
                             Comments.Add(word);
+                            mainCode.Add("; " + word);
                             token.key = 'S';
                             token.value = checkListConst(Comments, word);
                             jump = true;
@@ -404,7 +403,7 @@ namespace Compiller
         {
             T();
             Token token = Scan(true);
-            if (token.key == 'R' && (token.value == 3 || token.value == 4))
+            if (token.key == 'R' && (token.value == 3 || token.value == 4)) // + - 
             {
                 int value = token.value;
                 E();
@@ -505,7 +504,7 @@ namespace Compiller
             {
                 Error("F", 13);
             }
-            if (token.key == 'R' && token.value == 6)
+            else if (token.key == 'R' && token.value == 6)
             {
                 Error("F", 8);
             }
@@ -615,7 +614,7 @@ namespace Compiller
                         }
                         break;
                     case 2:
-                        Error("F", 13);
+                        Error("F", 22);
                         break;
                 }
             }
@@ -754,7 +753,7 @@ namespace Compiller
             else if (!(token.key == 'K' && (token.value == 9 || token.value == 16 || token.value == -1) || (token.key == 'D' && token.value == -1) ||
                     token.key == 'R' && (token.value == 11 || token.value == -1))) // false || true, ; , all D, all R
             {
-                Error("FL", 13);
+                Error("FL", 1);
             }
         }
 
@@ -764,7 +763,7 @@ namespace Compiller
             if (!(token.key == 'R' && (token.value == 1 || token.value == 2) ||
                 token.key == 'D' && (token.value == 0 || token.value == 3 || token.value == 4 || token.value == 7))) // >, <, ==, <=, >=, !=
             {
-                Error("ZN", 13);
+                Error("ZN", 23);
             }
             else
             {
@@ -823,16 +822,16 @@ namespace Compiller
         static void Progr() // начало программы 
         {
             Token token = Scan(true);
-            if (!(token.key == 'K' && token.value == 0))
+            if (!(token.key == 'K' && token.value == 0)) //'program'
             {
                 Error("Progr", 12);
             }
             else
             {
-                startCode.Add("\t.8086");
-                startCode.Add("\t.model small");
-                startCode.Add("\t.stack 100h");
-                startCode.Add("\t.data");
+                dataCode.Add("\t.8086");
+                dataCode.Add("\t.model small");
+                dataCode.Add("\t.stack 100h");
+                dataCode.Add("\t.data");
                 mainCode.Add(".code");
                 token = Scan(true);
                 if (!(token.key == 'I'))
@@ -864,11 +863,11 @@ namespace Compiller
                                 dataCode.Add("\t@buf      db    256 DUP (?)");
                                 dataCode.Add("\terr_msg   db    \"Input error, try again\", 0Dh, 0Ah, \"$\"");
                                 dataCode.Add("\t@true     db    \"true\"");
-                                dataCode.Add("\t@false     db    \"false\"");
-                                dataCode.Add("\t@@true     db    \"true$\"");
-                                dataCode.Add("\t@@false     db    \"false$\"");
-                                dataCode.Add("\tclrf   db   0Dh, 0Ah, \"$\"");
-                                dataCode.Add("\toutput  db  6 DUP (?), \"$\"");
+                                dataCode.Add("\t@false    db    \"false\"");
+                                dataCode.Add("\t@@true    db    \"true$\"");
+                                dataCode.Add("\t@@false   db    \"false$\"");
+                                dataCode.Add("\tclrf      db    0Dh, 0Ah, \"$\"");
+                                dataCode.Add("\toutput    db    6 DUP (?), \"$\"");
                                 dataCode.Add("; using data");
                                 Declare();
                                 token = Scan(true);
@@ -971,7 +970,7 @@ namespace Compiller
                 }
                 else
                 {
-                    Error("Declare", 13);
+                    Error("Declare", 20);
                 }
             }
         }
@@ -1116,11 +1115,7 @@ namespace Compiller
         static void Operators()
         {
             Token token = Scan(true);
-            if (token.key == 'R' && token.value == 17)
-            {
-
-            }
-            else if (!(token.key == 'I' || token.key == 'K'))
+            if (!(token.key == 'I' || token.key == 'K' || (token.key == 'R' && token.value == 17)))
             {
                 Error("Body operators", 18);
             }
@@ -1169,7 +1164,7 @@ namespace Compiller
                         token = Scan(true);
                         if (!(token.key == 'I' || token.key == 'C' || token.key == 'L' || (token.key == 'K' && (token.value == 9 || token.value == 16)) || (token.key == 'R' && token.value == 5)))
                         {
-                            Error("Let", 13);
+                            Error("Let", 24);
                         }
                         else if (token.key == 'L')
                         {
@@ -1289,7 +1284,7 @@ namespace Compiller
                         Erase(token);
                     }
                     else
-                        Error("If", 13);
+                        Error("If", 20);
                     mainCode.Add(elseMark + ":");
                 }
                 else if (token.key == 'K' && token.value == 18) //while
@@ -1794,7 +1789,7 @@ namespace Compiller
         {
             mainCode.Add("; write literal()");
             string textp = GenerateAsmMark();
-            dataCode.Add(textp + "\t db \"" + line + "$\"");
+            dataCode.Add("\t" + textp + "\tdb\t\"" + line + "$\"");
             mainCode.Add("\tlea dx, " + textp);
             mainCode.Add("\tmov ah, 9");
             mainCode.Add("\tint 21h");
@@ -1869,18 +1864,18 @@ namespace Compiller
             {
                 switch (w.type)
                 {
-                    case 0: dataCode.Add(w.word + "\tdb\t" + masLenght + " dup " + "(?)"); break;
-                    case 1: dataCode.Add(w.word + "\tdw\t" + masLenght + " dup " + "(?)"); break;
-                    case 2: dataCode.Add(w.word + "\tdb\t" + masLenght + " dup " + "(?)"); break;
+                    case 0: dataCode.Add("\t" + w.word + "\tdb\t" + masLenght + " dup " + "(?)"); break;
+                    case 1: dataCode.Add("\t" + w.word + "\tdw\t" + masLenght + " dup " + "(?)"); break;
+                    case 2: dataCode.Add("\t" + w.word + "\tdb\t" + masLenght + " dup " + "(?)"); break;
                 }
             }
             else
             {
                 switch (w.type)
                 {
-                    case 0: dataCode.Add(w.word + "\tdb\t" + "(?)"); break;
-                    case 1: dataCode.Add(w.word + "\tdw\t" + "(?)"); break;
-                    case 2: dataCode.Add(w.word + "\tdb\t" + "(?)"); break;
+                    case 0: dataCode.Add("\t" + w.word + "\tdb\t" + "(?)"); break;
+                    case 1: dataCode.Add("\t" + w.word + "\tdw\t" + "(?)"); break;
+                    case 2: dataCode.Add("\t" + w.word + "\tdb\t" + "(?)"); break;
                 }
             }
             ids.Add(w);
@@ -1957,6 +1952,15 @@ namespace Compiller
                     break;
                 case 21:
                     Console.WriteLine("Ошибка типа данных идентификатора, или идентификатора не существует!");
+                    break;
+                case 22:
+                    Console.WriteLine("Неверное использование типа данных char!");
+                    break;
+                case 23:
+                    Console.WriteLine("Ожидался знак сравнения!");
+                    break;
+                case 24:
+                    Console.WriteLine("Неверное присваивание!");
                     break;
             }
             Thread.Sleep(10000);
