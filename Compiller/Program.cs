@@ -49,6 +49,7 @@ namespace Compiller
         static int loop = 0;
         static int masLenght;
         static int markCount = 0;
+        static int t = 0;
         static string identic;
         static string id;
         static int cmpType;
@@ -323,7 +324,8 @@ namespace Compiller
                             }
                             word += buff[posB];
                             posB++;
-                            L.Add(word);
+                            if (checkListConst(L, word) == -1)
+                                L.Add(word);
                             token.key = 'L';
                             token.value = checkListConst(L, word);
                             jump = false;
@@ -368,19 +370,18 @@ namespace Compiller
                         {
                             while (buff[posB] != '/')
                             {
-                                if (!(buff[posB] == ' '))
+                                if (!(buff[posB] == ' ' && posB + 1 < str[row].Length && buff[posB + 1] == ' '))
                                     word += buff[posB];
-                                posB++;                                
+                                posB++;
                                 if (posB >= str[row].Length)
                                 {
                                     row++;
                                     posB = 0;
                                     buff = str[row].ToCharArray(0, str[row].Length);
-                                    word += ' ';
                                 }
                             }
                             word += buff[posB];
-                            char[] charsToTrim = { '/', '*', '/', '*' };
+                            char[] charsToTrim = { '/', '*', ' ' };
                             word = word.Trim(charsToTrim);
                             posB++;
                             Comments.Add(word);
@@ -403,7 +404,7 @@ namespace Compiller
         {
             T();
             Token token = Scan(true);
-            if (token.key == 'R' && (token.value == 3 || token.value == 4)) // + - 
+            if (token.key == 'R' && (token.value == 3 || token.value == 4)) // '+' and '-'
             {
                 int value = token.value;
                 E();
@@ -422,15 +423,15 @@ namespace Compiller
                     mainCode.Add("\tpush ax");
                 }
             }
-            else if (token.key == 'D' && (token.value == 1 || token.value == 2)) // ++ and --
+            else if (token.key == 'D' && (token.value == 1 || token.value == 2)) // '++' and '--'
             {
-                if (token.value == 1) //++
+                if (token.value == 1) // '++'
                 {
                     mainCode.Add("\tmov ax, " + id + "[di]");
                     mainCode.Add("\tinc ax");
                     mainCode.Add("\tmov " + id + "[di], ax");
                 }
-                else //--
+                else // '--'
                 {
                     mainCode.Add("\tmov ax, " + id + "[di]");
                     mainCode.Add("\tdec ax");
@@ -450,11 +451,11 @@ namespace Compiller
                 {
                     Error("T", 8);
                 }
-                else if (token.key == 'R' && (token.value == 7 || token.value == 8))
+                else if (token.key == 'R' && (token.value == 7 || token.value == 8)) // '*' and '/'
                 {
                     int value = token.value;
                     T();
-                    if (value == 7)
+                    if (value == 7) // '/'
                     {
                         mainCode.Add("\tpop bx");
                         mainCode.Add("\tpop ax");
@@ -462,7 +463,7 @@ namespace Compiller
                         mainCode.Add("\tdiv bx");
                         mainCode.Add("\tpush ax");
                     }
-                    else
+                    else // '*'
                     {
                         mainCode.Add("\tpop bx");
                         mainCode.Add("\tpop ax");
@@ -473,18 +474,18 @@ namespace Compiller
                 else
                     Erase(token);
             else if (counter != 0)
-                if (token.key == 'R' && (token.value == 7 || token.value == 8))
+                if (token.key == 'R' && (token.value == 7 || token.value == 8)) // '*' and '/'
                 {
                     int value = token.value;
                     T();
-                    if (value == 7)
+                    if (value == 7) // '/'
                     {
                         mainCode.Add("\tpop bx");
                         mainCode.Add("\tpop ax");
                         mainCode.Add("\tmul bx");
                         mainCode.Add("\tpush ax");
                     }
-                    else
+                    else // '*'
                     {
                         mainCode.Add("\tpop bx");
                         mainCode.Add("\tpop ax");
@@ -527,30 +528,33 @@ namespace Compiller
             }
             if (!(token.key == 'I' || token.key == 'C' || token.key == 'R' && (token.value == 11 || token.value == -1) || token.key == 'D' && (token.value == 1 || token.value == 2)))
             {
-                Error("F", 13);
+                Error("F - Let", 13);
             }
             if (token.key == 'C')
             {
-                mainCode.Add("\tmov ax, " + Convert.ToInt32(GetWord(token, C)));
-                mainCode.Add("\tpush ax");
+                if (t == 1)
+                {
+                    mainCode.Add("\tmov ax, " + Convert.ToInt32(GetWord(token, C)));
+                    mainCode.Add("\tpush ax");
+                }
+                else
+                    Error("F - Let", 24);
             }
             else if (token.key == 'I')
-            {
-                int temp = 1;
-                bool mas = false;
-                string ident = "";
+            {                
+                int i;
                 find = false;
-                for (int i = 0; i < ids.Count; i++)
+                for (i = 0; i < ids.Count; i++)
                 {
                     if (ids[i].word.Equals(GetWord(token, I)))
-                    {
-                        temp = ids[i].type;
-                        mas = ids[i].mas;
-                        ident = ids[i].word;
+                    {                       
                         id = ids[i].word;
+                        find = true;
                         break;
                     }                       
-                }               
+                }
+                if (!find)
+                    Error("Let", 25);
                 token = Scan(true);
                 if (token.key == 'D' || (token.key == 'R' && token.value != 18))
                 {
@@ -559,68 +563,84 @@ namespace Compiller
                 else if (token.key == 'R' && token.value == 18) //[
                 {
                     mainCode.Add("; let() [] ");
-                    for (int i = 0; i < ids.Count; i++)
+                    if (ids[i].mas == true)
                     {
-                        if (ids[i].word.Equals(ident) && ids[i].mas == true)
-                        {
-                            E();
-                            mainCode.Add("\tpop di");
-                            token = Scan(true);
-                            if (!(token.key == 'R' && token.value == 19))
-                                Error("Let array", 15);
-                            find = true;
-                            break;
-                        }
+                        int temp = t;
+                        t = 1;
+                        E();
+                        t = temp;
+                        mainCode.Add("\tpop di");
+                        token = Scan(true);
+                        if (!(token.key == 'R' && token.value == 19))
+                            Error("Let array", 15);
                     }
-                    if (!find)
-                    {
+                    else
                         Error("Let array", 21);
-                    }
+
                 }
-                switch (temp)
+                if(!(ids[i].type == t))
                 {
-                    case 0:
-                        {
-                            if(mas)
-                            {
-                                mainCode.Add("\tmov ax, 0");
-                                mainCode.Add("\tmov al, " + ident + "[di]");
-                                mainCode.Add("\tpush ax");
-                            }
-                            else
-                            {
-                                mainCode.Add("\tmov di, 0");
-                                mainCode.Add("\tmov ax, 0");
-                                mainCode.Add("\tmov al, " + ident + "[di]");
-                                mainCode.Add("\tpush ax");
-                            }                           
-                        }
-                        break;
-                    case 1:
-                        {
-                            if (mas)
-                            {
-                                mainCode.Add("\tshl di, 1");
-                                mainCode.Add("\tmov ax, " + ident + "[di]");
-                                mainCode.Add("\tpush ax");
-                            }
-                            else
-                            {
-                                mainCode.Add("\tmov di, 0");
-                                mainCode.Add("\tshl di, 1");
-                                mainCode.Add("\tmov ax, " + ident + "[di]");
-                                mainCode.Add("\tpush ax");
-                            }                               
-                        }
-                        break;
-                    case 2:
-                        Error("F", 22);
-                        break;
+                    Error("F - Let", 24);
                 }
+                else
+                    switch (ids[i].type)
+                    {
+                        case 0:
+                            {
+                                if(ids[i].mas)
+                                {
+                                    mainCode.Add("\tmov ax, 0");
+                                    mainCode.Add("\tmov al, " + ids[i].word + "[di]");
+                                    mainCode.Add("\tpush ax");
+                                }
+                                else
+                                {
+                                    mainCode.Add("\tmov di, 0");
+                                    mainCode.Add("\tmov ax, 0");
+                                    mainCode.Add("\tmov al, " + ids[i].word + "[di]");
+                                    mainCode.Add("\tpush ax");
+                                }                           
+                            }
+                            break;
+                        case 1:
+                            {
+                                if (ids[i].mas)
+                                {
+                                    mainCode.Add("\tshl di, 1");
+                                    mainCode.Add("\tmov ax, " + ids[i].word + "[di]");
+                                    mainCode.Add("\tpush ax");
+                                }
+                                else
+                                {
+                                    mainCode.Add("\tmov di, 0");
+                                    mainCode.Add("\tshl di, 1");
+                                    mainCode.Add("\tmov ax, " + ids[i].word + "[di]");
+                                    mainCode.Add("\tpush ax");
+                                }                               
+                            }
+                            break;
+                        case 2:
+                            {
+                                if (ids[i].mas)
+                                {
+                                    mainCode.Add("\tmov ax, 0");
+                                    mainCode.Add("\tmov al, " + ids[i].word + "[di]");
+                                    mainCode.Add("\tpush ax");
+                                }
+                                else
+                                {
+                                    mainCode.Add("\tmov di, 0");
+                                    mainCode.Add("\tmov ax, 0");
+                                    mainCode.Add("\tmov al, " + ids[i].word + "[di]");
+                                    mainCode.Add("\tpush ax");
+                                }
+                            }
+                            break;
+                    }
             }
-            else if (token.key == 'D' && (token.value == 1 || token.value == 2)) // ++ and --
+            else if (token.key == 'D' && (token.value == 1 || token.value == 2)) // '++' and '--'
             {
-                if (token.value == 1) //++
+                if (token.value == 1) // '++'
                 {
                     F();
                     mainCode.Add("\tpop ax");
@@ -628,7 +648,7 @@ namespace Compiller
                     mainCode.Add("\tmov " + id + "[di], ax");
                     mainCode.Add("\tpush ax");
                 }
-                else //--
+                else // '--'
                 {
                     F();
                     mainCode.Add("\tpop ax");
@@ -648,7 +668,7 @@ namespace Compiller
         {
             TL();
             Token token = Scan(true);
-            if (token.key == 'D' && token.value == 5) // ||
+            if (token.key == 'D' && token.value == 5) // '||'
             {
                 TL();
                 mainCode.Add("\tpop bx");
@@ -663,7 +683,7 @@ namespace Compiller
         {
             FL();
             Token token = Scan(true);
-            if (token.key == 'D' && token.value == 6) // &&
+            if (token.key == 'D' && token.value == 6) // '&&'
             {
                 FL();
                 mainCode.Add("\tpop bx");
@@ -678,7 +698,7 @@ namespace Compiller
         {
             Token token = Scan(true);
             string trueMark, falseMark;
-            if ((token.key == 'R' && token.value == 6)) // (
+            if ((token.key == 'R' && token.value == 6)) // '('
             {
                 Error("FL", 9);
             }
@@ -687,13 +707,13 @@ namespace Compiller
                 counter++;
                 EL();
                 token = Scan(true);
-                if (!(token.key == 'R' && token.value == 6)) // (
+                if (!(token.key == 'R' && token.value == 6)) // '('
                 {
                     Error("FL", 9);
                 }
                 counter--;
                 token = Scan(true);
-                if (token.key == 'D' || (token.key == 'R' && token.value != 11) || (token.key == 'K' && (token.value == 26 || token.value == 7))) // ;
+                if (token.key == 'D' || (token.key == 'R' && token.value != 11) || (token.key == 'K' && (token.value == 26 || token.value == 7))) // ';'
                 {
                     Erase(token);
                     token.value = -1;
@@ -705,24 +725,33 @@ namespace Compiller
                 {
                     Error("FL", 20);
                 }
-                if (token.key == 'R' && token.value == 12) // !
+                if (token.key == 'R' && token.value == 12) // '!'
                 {
                     FL();
+                    string notMark1 = GenerateAsmMark();
+                    string notMark2 = GenerateAsmMark();
                     mainCode.Add("\tpop ax");
-                    mainCode.Add("\tnot ax");
-                    mainCode.Add("\tpush ax");
+                    mainCode.Add("\tcmp ax, 0");
+                    mainCode.Add("\tje " + notMark1);
+                    mainCode.Add("\tpush 0");
+                    mainCode.Add("\tjmp " + notMark2);
+                    mainCode.Add(notMark1 + ":");
+                    mainCode.Add("\tpush 1");
+                    mainCode.Add(notMark2 + ":");
+
                 }
                 else if (token.key == 'K' && (token.value == 9 || token.value == 16))
                 {
                     switch (token.value)
                     {
-                        case 9: mainCode.Add("\tpush 0"); break; // false
-                        case 16: mainCode.Add("\tpush 1"); break; // true
+                        case 9: mainCode.Add("\tpush 0"); break; // 'false'
+                        case 16: mainCode.Add("\tpush 1"); break; // 'true'
                     }
                 }
                 else if (token.key == 'I' || token.key == 'C')
                 {
                     Erase(token);
+                    t = 1;
                     E();
                     Z();
                     E();
@@ -735,12 +764,12 @@ namespace Compiller
 
                     switch (cmpType)
                     {
-                        case 0: mainCode.Add("\tje " + trueMark); break; // ==
-                        case 1: mainCode.Add("\tjb " + trueMark); break; // <
-                        case 2: mainCode.Add("\tja " + trueMark); break; // >
-                        case 3: mainCode.Add("\tjbe " + trueMark); break; // <=
-                        case 4: mainCode.Add("\tjae " + trueMark); break; // >=
-                        case 7: mainCode.Add("\tjne " + trueMark); break; // !=
+                        case 0: mainCode.Add("\tje " + trueMark); break; // '=='
+                        case 1: mainCode.Add("\tjb " + trueMark); break; // '<'
+                        case 2: mainCode.Add("\tja " + trueMark); break; // '>'
+                        case 3: mainCode.Add("\tjbe " + trueMark); break; // '<='
+                        case 4: mainCode.Add("\tjae " + trueMark); break; // '>='
+                        case 7: mainCode.Add("\tjne " + trueMark); break; // '!='
                     }
 
                     mainCode.Add("\tpush 0");
@@ -751,7 +780,7 @@ namespace Compiller
                 }
             }
             else if (!(token.key == 'K' && (token.value == 9 || token.value == 16 || token.value == -1) || (token.key == 'D' && token.value == -1) ||
-                    token.key == 'R' && (token.value == 11 || token.value == -1))) // false || true, ; , all D, all R
+                    token.key == 'R' && (token.value == 11 || token.value == -1))) // 'false' || 'true', ';' , all D, all R
             {
                 Error("FL", 1);
             }
@@ -761,7 +790,7 @@ namespace Compiller
         {
             Token token = Scan(true);
             if (!(token.key == 'R' && (token.value == 1 || token.value == 2) ||
-                token.key == 'D' && (token.value == 0 || token.value == 3 || token.value == 4 || token.value == 7))) // >, <, ==, <=, >=, !=
+                token.key == 'D' && (token.value == 0 || token.value == 3 || token.value == 4 || token.value == 7))) // '>', '<', '==', '<=', '>=', '!='
             {
                 Error("ZN", 23);
             }
@@ -842,7 +871,7 @@ namespace Compiller
                 {
 
                     token = Scan(true);
-                    if (!(token.key == 'R' && token.value == 11)) // ;
+                    if (!(token.key == 'R' && token.value == 11)) // ';'
                     {
                         Error("Progr", 1);
                     }
@@ -914,7 +943,7 @@ namespace Compiller
         static void End() //конец программы
         {
             Token token = Scan(true);
-            if (!(token.key == 'K' && token.value == 23)) //end
+            if (!(token.key == 'K' && token.value == 23)) // 'end'
             {
                 Error("End", 5);
             }
@@ -943,11 +972,11 @@ namespace Compiller
                 w.mas = false;
                 words.Add(w);
                 token = Scan(true);
-                if (token.key == 'R' && token.value == 10) //,
+                if (token.key == 'R' && token.value == 10) // ','
                 {
                     Declare();
                 }
-                else if (!(token.key == 'R' && token.value == 15)) //:
+                else if (!(token.key == 'R' && token.value == 15)) // ':'
                 {
                     Error("Declare", 2);
                 }
@@ -978,7 +1007,7 @@ namespace Compiller
         static void VarType()
         {
             Token token = Scan(true);
-            if (token.key == 'K' && token.value == 24) // array
+            if (token.key == 'K' && token.value == 24) // 'array'
             {
                 for (int i = 0; i < words.Count; i++)
                 {
@@ -1006,7 +1035,7 @@ namespace Compiller
         static void FArray()
         {
             Token token = Scan(true);
-            if (!(token.key == 'R' && token.value == 18))//[
+            if (!(token.key == 'R' && token.value == 18))// '['
             {
                 Error("Array", 14);
             }
@@ -1019,12 +1048,12 @@ namespace Compiller
                 }
                 masLenght = Convert.ToInt32(GetWord(token, C));
                 token = Scan(true);
-                if (!(token.key == 'R' && token.value == 19)) //]
+                if (!(token.key == 'R' && token.value == 19)) // ']'
                 {
                     Error("Array", 15);
                 }
                 token = Scan(true);
-                if (!(token.key == 'K' && token.value == 25)) // of
+                if (!(token.key == 'K' && token.value == 25)) // 'of'
                 {
                     Error("Array", 17);
                 }
@@ -1044,7 +1073,7 @@ namespace Compiller
         static void Basic()
         {
             Token token = Scan(true);
-            if (token.value == 2) // bool
+            if (token.value == 2) // 'bool'
             {
                 for (int i = 0; i < words.Count; i++)
                 {
@@ -1056,7 +1085,7 @@ namespace Compiller
                     words.Insert(i, temp);
                 }
             }
-            else if (token.value == 12) // int
+            else if (token.value == 12) // 'int'
             {
                 for (int i = 0; i < words.Count; i++)
                 {
@@ -1068,7 +1097,7 @@ namespace Compiller
                     words.Insert(i, temp);
                 }
             }
-            else if (token.value == 5) // char
+            else if (token.value == 5) // 'char'
             {
                 for (int i = 0; i < words.Count; i++)
                 {
@@ -1090,7 +1119,7 @@ namespace Compiller
         static void Body()
         {
             Token token = Scan(true);
-            if (!(token.key == 'R' && token.value == 16)) // {
+            if (!(token.key == 'R' && token.value == 16)) // '{'
             {
                 Error("Main", 3);
             }
@@ -1104,7 +1133,7 @@ namespace Compiller
                     Erase(token);
                     Operators();
                 }
-                if (!(token.key == 'R' && token.value == 17)) //}
+                if (!(token.key == 'R' && token.value == 17)) // '}'
                 {
                     Error("Body", 4);
                 }
@@ -1129,28 +1158,37 @@ namespace Compiller
                 {
                     identic = GetWord(token, I);
                     find = false;
+                    int i;
+                    for (i = 0; i < ids.Count; i++)
+                    {
+                        if (ids[i].word.Equals(identic))
+                        {
+                            t = ids[i].type;
+                            find = true;
+                            break;
+                        }                        
+                    }
+                    if(!find)
+                        Error("Let", 25);
                     token = Scan(true);
                     if (token.key == 'D' && token.value == 14)
-                    {
-                        mainCode.Add("\tmov di, 0");
+                    {               
                         Erase(token);
                     }
-                    else if (token.key == 'R' && token.value == 18) //[
-                    {
-                        for (int i = 0; i < ids.Count; i++)
+                    else if (token.key == 'R' && token.value == 18) // '['
+                    {                        
+                        if (ids[i].mas == true)
                         {
-                            if (ids[i].word.Equals(identic) && ids[i].mas == true)
-                            {
-                                mainCode.Add("; array index");
-                                E();                               
-                                token = Scan(true);
-                                if (!(token.key == 'R' && token.value == 19))
-                                    Error("Let", 15);
-                                find = true;
-                                break;
-                            }
+                            mainCode.Add("; array index");
+                            int temp = t;
+                            t = 1;
+                            E();
+                            t = temp;
+                            token = Scan(true);
+                            if (!(token.key == 'R' && token.value == 19))
+                                Error("Let", 15);
                         }
-                        if (!find)
+                        else 
                         {
                             Error("Let mas", 21);
                         }
@@ -1167,23 +1205,18 @@ namespace Compiller
                             Error("Let", 24);
                         }
                         else if (token.key == 'L')
-                        {
-                            for (int i = 0; i < ids.Count; i++)
+                        {               
+                            if (ids[i].type == 2)
                             {
-                                if (ids[i].word.Equals(identic) && ids[i].type == 2)
-                                {
-                                    mainCode.Add("; let char");
-                                    char[] s = GetWord(token, L).ToArray();
-                                    mainCode.Add("\tpush \"" + s[1] + "\"");
-                                    mainCode.Add("\tpop ax");
-                                    if(!(ids[i].mas))
-                                        mainCode.Add("\tmov di, 0");
-                                    mainCode.Add("\tmov " + identic + "[di], al");
-                                    find = true;
-                                    break;
-                                }
+                                mainCode.Add("; let char");
+                                char[] s = GetWord(token, L).ToArray();
+                                mainCode.Add("\tpush \"" + s[1] + "\"");
+                                mainCode.Add("\tpop ax");
+                                if(!(ids[i].mas))
+                                    mainCode.Add("\tmov di, 0");
+                                mainCode.Add("\tmov " + identic + "[di], al");
                             }
-                            if (!find)
+                            else
                             {
                                 Error("Let literal", 21);
                             }
@@ -1192,77 +1225,114 @@ namespace Compiller
                         else if (token.key == 'C' || token.key == 'I' || ( token.key == 'R' && token.value == 5))
                         {
                             Erase(token);
-                            for (int i = 0; i < ids.Count; i++)
+                            find = false;
+                            switch(ids[i].type)
                             {
-                                if (ids[i].word.Equals(identic) && ids[i].type == 1)
-                                {
-                                    mainCode.Add("; let ariphmetics");
-                                    if (ids[i].mas)
+                                case 0:
                                     {
-                                        E();
-                                        mainCode.Add("\tpop ax");
-                                        mainCode.Add("\tpop di");
-                                        mainCode.Add("\tshl di, 1");
-                                        mainCode.Add("\tmov " + identic + "[di], ax");
+                                        mainCode.Add("; let bool");
+                                        if (ids[i].mas)
+                                        {
+                                            E();
+                                            mainCode.Add("\tpop ax");
+                                            mainCode.Add("\tpop di");
+                                            mainCode.Add("\tmov " + identic + "[di], al");
+                                        }
+                                        else
+                                        {
+                                            E();
+                                            mainCode.Add("\tpop ax"); 
+                                            mainCode.Add("\tmov di, 0");
+                                            mainCode.Add("\tmov " + identic + "[di], al");
+                                        }
+                                        find = true;
                                     }
-                                    else
-                                    {
-                                        E();
-                                        mainCode.Add("\tpop ax");
-                                        mainCode.Add("\tmov " + identic + "[di], ax");
-                                    }                                                                        
-                                    find = true;
                                     break;
-                                }
+                                case 1:
+                                    {
+                                        mainCode.Add("; let ariphmetics");
+                                        if (ids[i].mas)
+                                        {
+                                            E();
+                                            mainCode.Add("\tpop ax");
+                                            mainCode.Add("\tpop di");
+                                            mainCode.Add("\tshl di, 1");
+                                            mainCode.Add("\tmov " + identic + "[di], ax");
+                                        }
+                                        else
+                                        {
+                                            E();
+                                            mainCode.Add("\tpop ax");
+                                            mainCode.Add("\tmov di, 0");
+                                            mainCode.Add("\tmov " + identic + "[di], ax");
+                                        }
+                                        find = true;
+                                    }
+                                    break;
+                                case 2:
+                                    {
+                                        mainCode.Add("; let char");
+                                        if (ids[i].mas)
+                                        {
+                                            E();
+                                            mainCode.Add("\tpop ax");
+                                            mainCode.Add("\tpop di");
+                                            mainCode.Add("\tmov " + identic + "[di], al");
+                                        }
+                                        else
+                                        {
+                                            E();
+                                            mainCode.Add("\tpop ax");
+                                            mainCode.Add("\tmov di, 0");
+                                            mainCode.Add("\tmov " + identic + "[di], al");
+                                        }
+                                        find = true;
+                                    }
+                                    break;
                             }
                             if (!find)
                             {
-                                Error("Let ariphmetics", 21);
+                                Error("Let", 21);
                             }
                             token = Scan(true);
                         }
-                        else if (token.key == 'K' && (token.value == 9 || token.value == 16)) //true | false
+                        else if (token.key == 'K' && (token.value == 9 || token.value == 16)) // 'true' | 'false'
                         {
-                            for (int i = 0; i < ids.Count; i++)
+                            if (ids[i].type == 0)
                             {
-                                if (ids[i].word.Equals(identic) && ids[i].type == 0)
+                                mainCode.Add("; let bool");
+                                if (token.value == 9) // 'false'
                                 {
-                                    mainCode.Add("; let bool");
-                                    if (token.value == 9) // false
-                                    {
-                                        mainCode.Add("\tpush 0");
-                                        mainCode.Add("\tpop ax");
-                                        mainCode.Add("\tmov " + identic + "[di], al");
-                                    }
-                                    else //true
-                                    {
-                                        mainCode.Add("\tpush 1");
-                                        mainCode.Add("\tpop ax");
-                                        mainCode.Add("\tmov " + identic + "[di], al");
-                                    }
-                                    find = true;
-                                    break;
+                                    mainCode.Add("\tpush 0");
+                                    mainCode.Add("\tpop ax");
+                                    mainCode.Add("\tmov " + identic + "[di], al");
+                                }
+                                else // 'true'
+                                {
+                                    mainCode.Add("\tpush 1");
+                                    mainCode.Add("\tpop ax");
+                                    mainCode.Add("\tmov " + identic + "[di], al");
                                 }
                             }
-                            if (!find)
+                            else
                             {
                                 Error("Let bool", 21);
                             }
                             token = Scan(true);
                         }
                         if (body == 0) token = Scan(true);
-                        if (!(token.key == 'R' && token.value == 11)) //;
+                        if (!(token.key == 'R' && token.value == 11)) // ';'
                         {
                             Error("Body operators", 1);
                         }
                     }
                 }
-                else if (token.key == 'K' && token.value == 11) //if
+                else if (token.key == 'K' && token.value == 11) // 'if'
                 {
                     mainCode.Add("; if()");
                     EL();
                     token = Scan(true);
-                    if (!(token.key == 'K' && token.value == 26)) //then
+                    if (!(token.key == 'K' && token.value == 26)) // 'then'
                         Erase(token);
                     string thenMark = GenerateAsmMark();
                     string elseMark = GenerateAsmMark();
@@ -1287,7 +1357,7 @@ namespace Compiller
                         Error("If", 20);
                     mainCode.Add(elseMark + ":");
                 }
-                else if (token.key == 'K' && token.value == 18) //while
+                else if (token.key == 'K' && token.value == 18) // 'while'
                 {
                     mainCode.Add("; while()");
                     string whileMark = GenerateAsmMark();
@@ -1295,7 +1365,7 @@ namespace Compiller
                     mainCode.Add(whileMark + ":");
                     EL();
                     token = Scan(true);
-                    if (!(token.key == 'K' && token.value == 7)) //do
+                    if (!(token.key == 'K' && token.value == 7)) // 'do'
                         Erase(token);
                     mainCode.Add("\tpop ax");
                     mainCode.Add("\tcmp ax, 0");
@@ -1304,7 +1374,7 @@ namespace Compiller
                     mainCode.Add("\tjmp " + whileMark);
                     mainCode.Add(endMark + ":");
                 }
-                else if (token.key == 'K' && token.value == 14) //read
+                else if (token.key == 'K' && token.value == 14) // 'read'
                 {
                     mainCode.Add("; readln()");
                     ReadF();
@@ -1312,14 +1382,14 @@ namespace Compiller
                     mainCode.Add("\tmov   ah, 9");
                     mainCode.Add("\tint   21h");
                 }
-                else if (token.key == 'K' && token.value == 19) //write
+                else if (token.key == 'K' && token.value == 19) // 'write'
                 {
                     mainCode.Add("; writeln()");
                     WriteF();
                     mainCode.Add("\tlea   dx, clrf");
                     mainCode.Add("\tmov   ah, 9");
                     mainCode.Add("\tint   21h");
-                }
+                }               
             }
             token = Scan(true);
             if (token.key == 'I' || token.key == 'K' && (token.value == 10 || token.value == 11 || token.value == 14 || token.value == 18 || token.value == 19 || token.value == 23))
@@ -1336,62 +1406,25 @@ namespace Compiller
         static void ReadF()
         {
             Token token = Scan(true);
-            if (!(token.key == 'R' && token.value == 5)) //(
+            int i;
+            if (!(token.key == 'R' && token.value == 5)) // '('
             {
                 Error("Read", 8);
             }
             else
             {
                 counter++;
-                token = Scan(true);                
+                token = Scan(true);
                 if (!(token.key == 'I' || (token.key == 'R' && token.value == 6)))
                 {
                     Error("Read", 0);
                 }
                 identic = GetWord(token, I);
                 find = false;
-                token = Scan(true);
-                if (token.key == 'R' && (token.value == 10 || token.value == 6))
-                {
-                    mainCode.Add("\tpush 0");
-                    Erase(token);
-                }
-                else if (token.key == 'R' && token.value == 18) //[
-                {
-                    mainCode.Add("; readln() [] ");
-                    for (int i = 0; i < ids.Count; i++)
-                    {
-                        if (ids[i].word.Equals(identic) && ids[i].mas == true)
-                        {
-                            E();                           
-                            token = Scan(true);
-                            if (!(token.key == 'R' && token.value == 19))
-                                Error("ReadF", 15);
-                            find = true;
-                            break;
-                        }
-                    }
-                    if (!find)
-                    {
-                        Error("ReadF mas", 21);
-                    }
-                }
-                for (int i = 0; i < ids.Count; i++)
+                for (i = 0; i < ids.Count; i++)
                 {
                     if (ids[i].word.Equals(identic))
-                    {                       
-                        switch (ids[i].type)
-                        {
-                            case 0:  //bool
-                                ReadBool(ids[i].word);
-                                break;
-                            case 1://int
-                                ReadInt(ids[i].word);
-                                break;
-                            case 2://char
-                                ReadChar(ids[i].word);
-                                break;
-                        }
+                    {
                         find = true;
                         break;
                     }
@@ -1401,61 +1434,59 @@ namespace Compiller
                     Error("ReadF", 21);
                 }
                 token = Scan(true);
-                while (!(token.key == 'R' && token.value == 6)) //)
+                if (token.key == 'R' && (token.value == 10 || token.value == 6))
                 {
-                    if (!(token.key == 'R' && token.value == 10)) //,
+                    mainCode.Add("\tpush 0");
+                    Erase(token);
+                }
+                else if (token.key == 'R' && token.value == 18) // '['
+                {
+                    mainCode.Add("; readln() [] ");
+                    if (ids[i].mas == true)
+                    {
+                        int temp = t;
+                        t = 1;
+                        E();
+                        t = temp;
+                        token = Scan(true);
+                        if (!(token.key == 'R' && token.value == 19))
+                            Error("ReadF", 15);
+                    }
+                    else
+                    {
+                        Error("ReadF mas", 21);
+                    }
+                }
+                switch (ids[i].type)
+                {
+                    case 0:  // 'bool'
+                        ReadBool(ids[i].word);
+                        break;
+                    case 1:  // 'int'
+                        ReadInt(ids[i].word);
+                        break;
+                    case 2:  // 'char'
+                        ReadChar(ids[i].word);
+                        break;
+                }
+                token = Scan(true);
+                while (!(token.key == 'R' && token.value == 6)) // ')'
+                {
+                    if (!(token.key == 'R' && token.value == 10)) // ','
                     {
                         Error("Read", 19);
                     }
                     token = Scan(true);
-                    identic = GetWord(token, I);
-                    find = false;
                     if (!(token.key == 'I'))
                     {
                         Error("Read", 0);
-                    }                   
-                    token = Scan(true);
-                    if (token.key == 'R' && (token.value == 10 || token.value == 6))
-                    {
-                        mainCode.Add("\tpush 0");
-                        Erase(token);
                     }
-                    else if (token.key == 'R' && token.value == 18) //[
-                    {
-                        mainCode.Add("; readln() [] ");
-                        for (int i = 0; i < ids.Count; i++)
-                        {
-                            if (ids[i].word.Equals(identic) && ids[i].mas == true)
-                            {
-                                E();
-                                token = Scan(true);
-                                if (!(token.key == 'R' && token.value == 19))
-                                    Error("ReadF", 15);
-                                find = true;
-                                break;
-                            }
-                        }
-                        if (!find)
-                        {
-                            Error("ReadF mas", 21);
-                        }
-                    }                    
-                    for (int i = 0; i < ids.Count; i++)
+                    identic = GetWord(token, I);
+                    find = false;
+                    for (i = 0; i < ids.Count; i++)
                     {
                         if (ids[i].word.Equals(identic))
                         {
-                            switch (ids[i].type)
-                            {
-                                case 0:  //bool
-                                    ReadBool(ids[i].word);
-                                    break;
-                                case 1://int
-                                    ReadInt(ids[i].word);
-                                    break;
-                                case 2://char
-                                    ReadChar(ids[i].word);
-                                    break;
-                            }
                             find = true;
                             break;
                         }
@@ -1465,9 +1496,45 @@ namespace Compiller
                         Error("ReadF", 21);
                     }
                     token = Scan(true);
+                    if (token.key == 'R' && (token.value == 10 || token.value == 6))
+                    {
+                        mainCode.Add("\tpush 0");
+                        Erase(token);
+                    }
+                    else if (token.key == 'R' && token.value == 18) // '['
+                    {
+                        mainCode.Add("; readln() [] ");
+                        if (ids[i].mas == true)
+                        {
+                            int temp = t;
+                            t = 1;
+                            E();
+                            t = temp;
+                            token = Scan(true);
+                            if (!(token.key == 'R' && token.value == 19))
+                                Error("ReadF", 15);
+                        }
+                        else
+                        {
+                            Error("ReadF mas", 21);
+                        }
+                    }
+                    switch (ids[i].type)
+                    {
+                        case 0:  // 'bool'
+                            ReadBool(ids[i].word);
+                            break;
+                        case 1:  // 'int'
+                            ReadInt(ids[i].word);
+                            break;
+                        case 2:  // 'char'
+                            ReadChar(ids[i].word);
+                            break;
+                    }
+                    token = Scan(true);
                 }
                 token = Scan(true);
-                if (!(token.key == 'R' && token.value == 11)) //;
+                if (!(token.key == 'R' && token.value == 11)) // ';'
                 {
                     Error("Read", 1);
                 }
@@ -1592,7 +1659,8 @@ namespace Compiller
         static void WriteF()
         {
             Token token = Scan(true);
-            if (!(token.key == 'R' && token.value == 5)) //(
+            int i;
+            if (!(token.key == 'R' && token.value == 5)) // '('
             {
                 Error("Write", 8);
             }
@@ -1612,35 +1680,39 @@ namespace Compiller
                 {
                     identic = GetWord(token, I);                   
                     find = false;
-                    for (int i = 0; i < ids.Count; i++)
+                    for (i = 0; i < ids.Count; i++)
                     {
                         if (ids[i].word.Equals(identic))
                         {
+                            t = ids[i].type;
                             Erase(token);
                             switch (ids[i].type)
                             {
-                                case 0:  //bool
+                                case 0:  // 'bool'
                                     {                                       
                                         E();
                                         WriteBool();
                                     }
                                     break;
-                                case 1://int
+                                case 1:  // 'int'
                                     {
                                         E();
                                         WriteInt();
                                     }
                                     break; 
-                                case 2://char
+                                case 2:  // 'char'
                                     {
                                         if (ids[i].mas)
                                         {
                                             Scan(true);
                                             token = Scan(true);
-                                            if (token.key == 'R' && token.value == 18) //[
+                                            if (token.key == 'R' && token.value == 18) // '['
                                             {
                                                 mainCode.Add("; writeln() [] ");
+                                                int temp = t;
+                                                t = 1;
                                                 E();
+                                                t = temp;
                                                 token = Scan(true);
                                                 if (!(token.key == 'R' && token.value == 19))
                                                     Error("ReadF", 15);
@@ -1666,9 +1738,9 @@ namespace Compiller
                     }
                 }                
                 token = Scan(true);
-                while (!(token.key == 'R' && token.value == 6)) //)
+                while (!(token.key == 'R' && token.value == 6)) // ')'
                 {
-                    if(!(token.key == 'R' && token.value == 10)) //,
+                    if(!(token.key == 'R' && token.value == 10)) // ','
                     {
                         Error("Write", 19);
                     }
@@ -1681,35 +1753,39 @@ namespace Compiller
                     {
                         identic = GetWord(token, I);
                         find = false;                        
-                        for (int i = 0; i < ids.Count; i++)
+                        for (i = 0; i < ids.Count; i++)
                         {
                             if (ids[i].word.Equals(identic))
                             {
+                                t = ids[i].type;
                                 Erase(token);
                                 switch (ids[i].type)
                                 {
-                                    case 0://bool
+                                    case 0:  // 'bool'
                                         {
                                             E();
                                             WriteBool();
                                         }
                                         break; 
-                                    case 1://int
+                                    case 1:  // 'int'
                                         {
                                             E();
                                             WriteInt();
                                         }
                                         break; 
-                                    case 2://char
+                                    case 2:// 'char'
                                         {
                                             if (ids[i].mas)
                                             {
                                                 Scan(true);
                                                 token = Scan(true);
-                                                if (token.key == 'R' && token.value == 18) //[
+                                                if (token.key == 'R' && token.value == 18) // '['
                                                 {
-                                                    mainCode.Add("; writeln() [] ");                                                   
+                                                    mainCode.Add("; writeln() [] ");
+                                                    int temp = t;
+                                                    t = 1;
                                                     E();
+                                                    t = temp;
                                                     token = Scan(true);
                                                     if (!(token.key == 'R' && token.value == 19))
                                                         Error("ReadF", 15);
@@ -1741,7 +1817,7 @@ namespace Compiller
                     token = Scan(true);
                 }
                 token = Scan(true);
-                if (!(token.key == 'R' && token.value == 11)) //;
+                if (!(token.key == 'R' && token.value == 11)) // ';'
                 {
                     Error("Write", 1);
                 }
@@ -1826,7 +1902,7 @@ namespace Compiller
         static void Loop()
         {
             Token token = Scan(true);
-            if (!(token.key == 'R' && (token.value == 11 || token.value == 16))) //{
+            if (!(token.key == 'R' && (token.value == 11 || token.value == 16))) // '{'
             {
                 Error("Loop", 3);
             }
@@ -1835,7 +1911,7 @@ namespace Compiller
                 loop++;
                 Operators();
                 token = Scan(true);
-                if (!(token.key == 'R' && token.value == 17)) // }
+                if (!(token.key == 'R' && token.value == 17)) // '}'
                 {
                     Error("Loop", 4);
                 }
@@ -1846,7 +1922,7 @@ namespace Compiller
         static bool Assign()
         {
             Token token = Scan(true);
-            if (!(token.key == 'D' && token.value == 14)) // :=
+            if (!(token.key == 'D' && token.value == 14)) // ':='
             {
                 Error("Assign", 16);
                 return false;
@@ -1962,6 +2038,9 @@ namespace Compiller
                 case 24:
                     Console.WriteLine("Неверное присваивание!");
                     break;
+                case 25:
+                    Console.WriteLine("Неизвестный идентификатор!");
+                    break;
             }
             Thread.Sleep(10000);
             Environment.Exit(0);
@@ -2015,7 +2094,7 @@ namespace Compiller
             {
                 Console.Write("\t" + " L" + L.IndexOf(text) + ": " + text + "\n");
             }
-
+            
             Console.WriteLine("\n" + " Ключевые слова:");
 
             foreach (string keys in my_K.Distinct())
