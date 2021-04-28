@@ -319,8 +319,13 @@ namespace Compiller
                             posB++;
                             while (buff[posB] != '"')
                             {
-                                word += buff[posB];
-                                posB++;
+                                if (posB < str[row].Length - 1)
+                                {
+                                    word += buff[posB];
+                                    posB++;
+                                }
+                                else
+                                    Error("Scanner", 26);
                             }
                             word += buff[posB];
                             posB++;
@@ -910,6 +915,7 @@ namespace Compiller
                                     mainCode.Add("\tmov ax, @data");
                                     mainCode.Add("\tmov ds, ax");
                                     mainCode.Add("\tmov es, ax");
+                                    mainCode.Add("\txor ax, ax");
                                     Body();
                                     End();
                                     mainCode.Add("mov ax, 4C00h");
@@ -1171,7 +1177,7 @@ namespace Compiller
                     if(!find)
                         Error("Let", 25);
                     token = Scan(true);
-                    if (token.key == 'D' && token.value == 14)
+                    if (token.key == 'R' && token.value == 0)
                     {               
                         Erase(token);
                     }
@@ -1197,7 +1203,7 @@ namespace Compiller
                     {
                         token = Scan(true);
                     }
-                    if (token.key == 'D' && token.value == 14)
+                    if (token.key == 'R' && token.value == 0) // '='
                     {
                         token = Scan(true);
                         if (!(token.key == 'I' || token.key == 'C' || token.key == 'L' || (token.key == 'K' && (token.value == 9 || token.value == 16)) || (token.key == 'R' && token.value == 5)))
@@ -1715,7 +1721,7 @@ namespace Compiller
                                                 t = temp;
                                                 token = Scan(true);
                                                 if (!(token.key == 'R' && token.value == 19))
-                                                    Error("ReadF", 15);
+                                                    Error("WriteF", 15);
                                             }
                                         }
                                         else
@@ -1788,7 +1794,7 @@ namespace Compiller
                                                     t = temp;
                                                     token = Scan(true);
                                                     if (!(token.key == 'R' && token.value == 19))
-                                                        Error("ReadF", 15);
+                                                        Error("WriteF", 15);
                                                 }
                                             }
                                             else
@@ -1922,7 +1928,7 @@ namespace Compiller
         static bool Assign()
         {
             Token token = Scan(true);
-            if (!(token.key == 'D' && token.value == 14)) // ':='
+            if (!(token.key == 'R' && token.value == 0)) // '='
             {
                 Error("Assign", 16);
                 return false;
@@ -1960,88 +1966,92 @@ namespace Compiller
 
         static void Error(string FuncName, int key)
         {
-            Console.WriteLine("Функция: " + FuncName + "\n\t");
+            Console.WriteLine(" Функция: " + FuncName + "\n\t");
             switch (key)
             {
                 case 0:
-                    Console.WriteLine("Ожидался идентификатор !");
+                    Console.WriteLine(" Ожидался идентификатор !");
                     break;
                 case 1:
-                    Console.WriteLine("Ожидалось \";\"!");
+                    Console.WriteLine(" Ожидалось \";\"!");
                     break;
                 case 2:
-                    Console.WriteLine("Ожидалось \":\"!");
+                    Console.WriteLine(" Ожидалось \":\"!");
                     break;
                 case 3:
-                    Console.WriteLine("Ожидалось \"{\"!");
+                    Console.WriteLine(" Ожидалось \"{\"!");
                     break;
                 case 4:
-                    Console.WriteLine("Ожидалось \"}\"!");
+                    Console.WriteLine(" Ожидалось \"}\"!");
                     break;
                 case 5:
-                    Console.WriteLine("Ожидался end!");
+                    Console.WriteLine(" Ожидался end!");
                     break;
                 case 6:
-                    Console.WriteLine("Ожидалось число!");
+                    Console.WriteLine(" Ожидалось число!");
                     break;
                 case 7:
-                    Console.WriteLine("Ожидался main!");
+                    Console.WriteLine(" Ожидался main!");
                     break;
                 case 8:
-                    Console.WriteLine("Ожидалось \"(\"!");
+                    Console.WriteLine(" Ожидалось \"(\"!");
                     break;
                 case 9:
-                    Console.WriteLine("Ожидалось \")\"!");
+                    Console.WriteLine(" Ожидалось \")\"!");
                     break;
                 case 10:
-                    Console.WriteLine("Ожидался тип данных int, bool, char!");
+                    Console.WriteLine(" Ожидался тип данных int, bool, char!");
                     break;
                 case 11:
-                    Console.WriteLine("Ожидался оператор или \"}\"!");
+                    Console.WriteLine(" Ожидался оператор или \"}\"!");
                     break;
                 case 12:
-                    Console.WriteLine("Ожидалось \"program\"!");
+                    Console.WriteLine(" Ожидалось \"program\"!");
                     break;
                 case 13:
-                    Console.WriteLine("Неверное выражение!");
+                    Console.WriteLine(" Неверное выражение!");
                     break;
                 case 14:
-                    Console.WriteLine("Ожидалось \"[\"!");
+                    Console.WriteLine(" Ожидалось \"[\"!");
                     break;
                 case 15:
-                    Console.WriteLine("Ожидалось \"]\"!");
+                    Console.WriteLine(" Ожидалось \"]\"!");
                     break;
                 case 16:
-                    Console.WriteLine("Ожидалось \":=\"!");
+                    Console.WriteLine(" Ожидалось \"=\"!");
                     break;
                 case 17:
-                    Console.WriteLine("Ожидалось \"of\"!");
+                    Console.WriteLine(" Ожидалось \"of\"!");
                     break;
                 case 18:
-                    Console.WriteLine("Ожидался оператор или ключевое слово!");
+                    Console.WriteLine(" Ожидался оператор или ключевое слово!");
                     break;
                 case 19:
-                    Console.WriteLine("Ожидалось \",\"!");
+                    Console.WriteLine(" Ожидалось \",\"!");
                     break;
                 case 20:
-                    Console.WriteLine("Ожидался идентификатор или ключевое слово!");
+                    Console.WriteLine(" Ожидался идентификатор или ключевое слово!");
                     break;
                 case 21:
-                    Console.WriteLine("Ошибка типа данных идентификатора, или идентификатора не существует!");
+                    Console.WriteLine(" Ошибка типа данных идентификатора, или идентификатора не существует!");
                     break;
                 case 22:
-                    Console.WriteLine("Неверное использование типа данных char!");
+                    Console.WriteLine(" Неверное использование типа данных char!");
                     break;
                 case 23:
-                    Console.WriteLine("Ожидался знак сравнения!");
+                    Console.WriteLine(" Ожидался знак сравнения!");
                     break;
                 case 24:
-                    Console.WriteLine("Неверное присваивание!");
+                    Console.WriteLine(" Неверное присваивание!");
                     break;
                 case 25:
-                    Console.WriteLine("Неизвестный идентификатор!");
+                    Console.WriteLine(" Неизвестный идентификатор!");
+                    break;
+                case 26:
+                    Console.WriteLine(" Ожидалось \'\"\'!");
                     break;
             }
+            Console.WriteLine("\n Строка: " + (row + 1));
             Thread.Sleep(10000);
             Environment.Exit(0);
         }
